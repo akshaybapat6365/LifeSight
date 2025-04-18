@@ -1,5 +1,6 @@
 import { convertToCoreMessages, Message, streamText } from "ai";
 import { z } from "zod";
+import { getBaseURL, toAbsoluteURL } from "@/utils/url";
 
 import { geminiProModel } from "@/ai";
 import {
@@ -28,7 +29,32 @@ export async function POST(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const coreMessages = convertToCoreMessages(messages).filter(
+  // Process messages with attachments
+  const processedMessages = messages.map(message => {
+    if (message.experimental_attachments && message.experimental_attachments.length > 0) {
+      return {
+        ...message,
+        experimental_attachments: message.experimental_attachments.map(attachment => {
+          // For Gemini: use fileId
+          if (attachment.fileId) {
+            return { fileId: attachment.fileId };
+          }
+          
+          // For OpenAI: convert relative URL to absolute URL
+          if (attachment.url && attachment.url.startsWith('/')) {
+            return { 
+              url: toAbsoluteURL(attachment.url) 
+            };
+          }
+          
+          return attachment;
+        })
+      };
+    }
+    return message;
+  });
+
+  const coreMessages = convertToCoreMessages(processedMessages).filter(
     (message) => message.content.length > 0,
   );
 
@@ -54,215 +80,278 @@ export async function POST(request: Request) {
         '
       `,
     messages: coreMessages,
-    tools: {
-      getWeather: {
-        description: "Get the current weather at a location",
-        parameters: z.object({
-          latitude: z.number().describe("Latitude coordinate"),
-          longitude: z.number().describe("Longitude coordinate"),
-        }),
-        execute: async ({ latitude, longitude }) => {
-          const response = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto`,
-          );
-
-          const weatherData = await response.json();
-          return weatherData;
-        },
-      },
-      displayFlightStatus: {
-        description: "Display the status of a flight",
-        parameters: z.object({
-          flightNumber: z.string().describe("Flight number"),
-          date: z.string().describe("Date of the flight"),
-        }),
-        execute: async ({ flightNumber, date }) => {
-          const flightStatus = await generateSampleFlightStatus({
-            flightNumber,
-            date,
-          });
-
-          return flightStatus;
-        },
-      },
-      searchFlights: {
-        description: "Search for flights based on the given parameters",
-        parameters: z.object({
-          origin: z.string().describe("Origin airport or city"),
-          destination: z.string().describe("Destination airport or city"),
-        }),
-        execute: async ({ origin, destination }) => {
-          const results = await generateSampleFlightSearchResults({
-            origin,
-            destination,
-          });
-
-          return results;
-        },
-      },
-      selectSeats: {
-        description: "Select seats for a flight",
-        parameters: z.object({
-          flightNumber: z.string().describe("Flight number"),
-        }),
-        execute: async ({ flightNumber }) => {
-          const seats = await generateSampleSeatSelection({ flightNumber });
-          return seats;
-        },
-      },
-      createReservation: {
-        description: "Display pending reservation details",
-        parameters: z.object({
-          seats: z.string().array().describe("Array of selected seat numbers"),
-          flightNumber: z.string().describe("Flight number"),
-          departure: z.object({
-            cityName: z.string().describe("Name of the departure city"),
-            airportCode: z.string().describe("Code of the departure airport"),
-            timestamp: z.string().describe("ISO 8601 date of departure"),
-            gate: z.string().describe("Departure gate"),
-            terminal: z.string().describe("Departure terminal"),
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "findFlights",
+          description:
+            "Searches for flights based on the origin, destination, and date.",
+          parameters: z.object({
+            origin: z
+              .string()
+              .describe("Origin airport code (3 letters) or city name"),
+            destination: z
+              .string()
+              .describe("Destination airport code (3 letters) or city name"),
+            date: z.string().describe("Date of travel (YYYY-MM-DD)"),
+            returnDate: z
+              .string()
+              .optional()
+              .describe("Return date (YYYY-MM-DD) for round trip flights"),
+            passengers: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe("Number of passengers"),
+            cabinClass: z
+              .string()
+              .optional()
+              .describe("Cabin class (economy, premium, business, first)"),
           }),
-          arrival: z.object({
-            cityName: z.string().describe("Name of the arrival city"),
-            airportCode: z.string().describe("Code of the arrival airport"),
-            timestamp: z.string().describe("ISO 8601 date of arrival"),
-            gate: z.string().describe("Arrival gate"),
-            terminal: z.string().describe("Arrival terminal"),
+          handler: () => {
+            return generateSampleFlightSearchResults();
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "getFlightStatus",
+          description: "Gets the status of a flight by flight number and date.",
+          parameters: z.object({
+            flightNumber: z
+              .string()
+              .describe(
+                "Flight number, including airline code and number (e.g., BA142)",
+              ),
+            date: z.string().describe("Date of the flight (YYYY-MM-DD)"),
           }),
-          passengerName: z.string().describe("Name of the passenger"),
-        }),
-        execute: async (props) => {
-          const { totalPriceInUSD } = await generateReservationPrice(props);
-          const session = await auth();
-
-          const id = generateUUID();
-
-          if (session && session.user && session.user.id) {
-            await createReservation({
-              id,
-              userId: session.user.id,
-              details: { ...props, totalPriceInUSD },
-            });
-
-            return { id, ...props, totalPriceInUSD };
-          } else {
+          handler: () => {
+            return generateSampleFlightStatus();
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "selectSeats",
+          description:
+            "Selects seats for passengers on a particular flight. Returns available and selected seats.",
+          parameters: z.object({
+            flightNumber: z
+              .string()
+              .describe(
+                "Flight number, including airline code and number (e.g., BA142)",
+              ),
+            date: z.string().describe("Date of the flight (YYYY-MM-DD)"),
+            passengers: z
+              .array(
+                z.object({
+                  name: z.string().describe("Passenger name"),
+                  seat: z
+                    .string()
+                    .describe(
+                      "Seat number (e.g., 12A, 12B). Format is [row number][seat letter].",
+                    ),
+                }),
+              )
+              .describe("Array of passengers and their selected seats"),
+          }),
+          handler: () => {
+            return generateSampleSeatSelection();
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "createReservation",
+          description:
+            "Creates a reservation with the selected flights, passenger information, and selected seats.",
+          parameters: z.object({
+            flightNumber: z
+              .string()
+              .describe(
+                "Flight number, including airline code and number (e.g., BA142)",
+              ),
+            date: z.string().describe("Date of the flight (YYYY-MM-DD)"),
+            passengers: z
+              .array(
+                z.object({
+                  name: z.string().describe("Passenger name"),
+                  email: z
+                    .string()
+                    .email()
+                    .optional()
+                    .describe("Passenger email"),
+                  seat: z
+                    .string()
+                    .describe(
+                      "Seat number (e.g., 12A, 12B). Format is [row number][seat letter].",
+                    ),
+                }),
+              )
+              .describe("Array of passengers and their selected seats"),
+            returnFlight: z
+              .object({
+                flightNumber: z
+                  .string()
+                  .describe(
+                    "Return flight number, including airline code and number (e.g., BA143)",
+                  ),
+                date: z
+                  .string()
+                  .describe("Date of the return flight (YYYY-MM-DD)"),
+                passengers: z
+                  .array(
+                    z.object({
+                      name: z.string().describe("Passenger name"),
+                      seat: z
+                        .string()
+                        .describe(
+                          "Seat number (e.g., 12A, 12B). Format is [row number][seat letter].",
+                        ),
+                    }),
+                  )
+                  .describe("Array of passengers and their selected seats"),
+              })
+              .optional()
+              .describe("Return flight information"),
+          }),
+          handler: async ({ flightNumber, date, passengers }) => {
+            const reservationId = generateUUID();
+            await createReservation(
+              reservationId,
+              flightNumber,
+              date,
+              JSON.stringify(passengers),
+              generateReservationPrice(),
+            );
+            return { reservationId, price: generateReservationPrice() };
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "getReservation",
+          description: "Gets a reservation by ID.",
+          parameters: z.object({
+            reservationId: z.string().describe("Reservation ID"),
+          }),
+          handler: async ({ reservationId }) => {
+            const reservation = await getReservationById(reservationId);
+            return reservation;
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "authorizePayment",
+          description:
+            "Authorizes a payment for a reservation. Returns the payment details.",
+          parameters: z.object({
+            reservationId: z.string().describe("Reservation ID"),
+            paymentMethod: z
+              .string()
+              .describe("Payment method (credit_card, paypal, apple_pay)"),
+            amount: z.number().describe("Payment amount"),
+            currency: z
+              .string()
+              .describe("Payment currency (USD, EUR, GBP, etc.)"),
+          }),
+          handler: ({ reservationId }) => {
             return {
-              error: "User is not signed in to perform this action!",
+              paymentId: generateUUID(),
+              reservationId,
+              status: "authorized",
+              transactionDate: new Date().toISOString(),
             };
-          }
+          },
         },
       },
-      authorizePayment: {
-        description:
-          "User will enter credentials to authorize payment, wait for user to repond when they are done",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-        }),
-        execute: async ({ reservationId }) => {
-          return { reservationId };
-        },
-      },
-      verifyPayment: {
-        description: "Verify payment status",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-        }),
-        execute: async ({ reservationId }) => {
-          const reservation = await getReservationById({ id: reservationId });
-
-          if (reservation.hasCompletedPayment) {
-            return { hasCompletedPayment: true };
-          } else {
-            return { hasCompletedPayment: false };
-          }
-        },
-      },
-      displayBoardingPass: {
-        description: "Display a boarding pass",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-          passengerName: z
-            .string()
-            .describe("Name of the passenger, in title case"),
-          flightNumber: z.string().describe("Flight number"),
-          seat: z.string().describe("Seat number"),
-          departure: z.object({
-            cityName: z.string().describe("Name of the departure city"),
-            airportCode: z.string().describe("Code of the departure airport"),
-            airportName: z.string().describe("Name of the departure airport"),
-            timestamp: z.string().describe("ISO 8601 date of departure"),
-            terminal: z.string().describe("Departure terminal"),
-            gate: z.string().describe("Departure gate"),
+      {
+        type: "function",
+        function: {
+          name: "verifyPayment",
+          description: "Verifies a payment by payment ID.",
+          parameters: z.object({
+            paymentId: z.string().describe("Payment ID"),
           }),
-          arrival: z.object({
-            cityName: z.string().describe("Name of the arrival city"),
-            airportCode: z.string().describe("Code of the arrival airport"),
-            airportName: z.string().describe("Name of the arrival airport"),
-            timestamp: z.string().describe("ISO 8601 date of arrival"),
-            terminal: z.string().describe("Arrival terminal"),
-            gate: z.string().describe("Arrival gate"),
-          }),
-        }),
-        execute: async (boardingPass) => {
-          return boardingPass;
+          handler: () => {
+            return {
+              status: "verified",
+              verificationDate: new Date().toISOString(),
+            };
+          },
         },
       },
-    },
-    onFinish: async ({ responseMessages }) => {
-      if (session.user && session.user.id) {
-        try {
-          await saveChat({
-            id,
-            messages: [...coreMessages, ...responseMessages],
-            userId: session.user.id,
-          });
-        } catch (error) {
-          console.error("Failed to save chat");
-        }
-      }
-    },
-    experimental_telemetry: {
-      isEnabled: true,
-      functionId: "stream-text",
-    },
+      {
+        type: "function",
+        function: {
+          name: "getBoardingPass",
+          description: "Gets a boarding pass by reservation ID.",
+          parameters: z.object({
+            reservationId: z.string().describe("Reservation ID"),
+            paymentId: z.string().describe("Payment ID"),
+          }),
+          handler: ({ reservationId }) => {
+            return {
+              boardingPassId: generateUUID(),
+              reservationId,
+              gateNumber: "B12",
+              boardingTime: "10:30",
+              gateCloseTime: "10:50",
+              terminal: "2",
+            };
+          },
+        },
+      },
+    ],
   });
 
-  return result.toDataStreamResponse({});
+  // Save the chat
+  if (id && coreMessages.length > 0) {
+    try {
+      await saveChat(id, session.user.id, coreMessages);
+    } catch (error) {
+      console.error("Error saving chat:", error);
+    }
+  }
+
+  return result.toDataStreamResponse();
 }
 
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
-
-  if (!id) {
-    return new Response("Not Found", { status: 404 });
-  }
-
   const session = await auth();
 
-  if (!session || !session.user) {
+  if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  if (!id) {
+    return Response.json({ error: "Missing chat ID" }, { status: 400 });
+  }
+
+  // Check if the chat belongs to the user
+  const chat = await getChatById({ id });
+  if (!chat || chat.userId !== session.user.id) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
   try {
-    const chat = await getChatById({ id });
-
-    if (chat.userId !== session.user.id) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    await deleteChatById({ id });
-
-    return new Response("Chat deleted", { status: 200 });
+    await deleteChatById(id);
+    return Response.json({ success: true });
   } catch (error) {
-    return new Response("An error occurred while processing your request", {
-      status: 500,
-    });
+    console.error("Error deleting chat:", error);
+    return Response.json(
+      { error: "Failed to delete chat" },
+      { status: 500 },
+    );
   }
 }
