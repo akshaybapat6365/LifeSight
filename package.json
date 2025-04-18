@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:ci": "playwright test --reporter=list"
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.51",
