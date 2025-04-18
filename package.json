@@ -6,7 +6,9 @@
     "dev": "next dev --turbo",
     "build": "tsx db/migrate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.51",
@@ -41,6 +43,7 @@
     "next": "15.0.0-canary.152",
     "next-auth": "5.0.0-beta.22",
     "next-themes": "^0.3.0",
+    "pg": "^8.14.1",
     "postgres": "^3.4.4",
     "react": "19.0.0-rc-7771d3a7-20240827",
     "react-dom": "19.0.0-rc-7771d3a7-20240827",
@@ -55,6 +58,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/d3-scale": "^4.0.8",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.4",
