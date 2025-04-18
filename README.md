@@ -37,6 +37,11 @@
 
 This template ships with Google Gemini `gemini-1.5-pro` models as the default. However, with the [AI SDK](https://sdk.vercel.ai/docs), you can switch LLM providers to [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://sdk.vercel.ai/providers/ai-sdk-providers) with just a few lines of code.
 
+### Image uploads
+* Types: JPEG, PNG • Max size 5 MB  
+* Gemini Vision 1.5‑pro handles analysis  
+* Automatic preview in chat + blood‑test analyzer
+
 ## Deploy Your Own
 
 You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
