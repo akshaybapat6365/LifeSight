@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Get environment variables with fallbacks
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30000,
@@ -12,7 +15,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'list' : 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     // Use headless mode in CI
@@ -26,7 +29,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

@@ -1,15 +1,19 @@
 import { test, expect } from '@playwright/test';
 
-test('JPEG upload renders in chat', async ({ page }) => {
-  await page.goto('http://localhost:3000');
+test('JPEG upload renders in chat', async ({ page, baseURL }) => {
+  await page.goto(baseURL || 'http://localhost:3000');
   
   // sign‑in or sign‑up helper
   try {
     // Check if login form is present
     const emailInput = await page.getByRole('textbox', { name: /email/i });
     if (await emailInput.isVisible()) {
-      await emailInput.fill('u@e.com');
-      await page.getByRole('textbox', { name: /password/i }).fill('123456');
+      // Use environment variables for credentials if available
+      const testEmail = process.env.TEST_EMAIL || 'u@e.com';
+      const testPassword = process.env.TEST_PASSWORD || '123456';
+      
+      await emailInput.fill(testEmail);
+      await page.getByRole('textbox', { name: /password/i }).fill(testPassword);
       await page.getByRole('button', { name: /sign in|sign up/i }).click();
     }
   } catch (error) {
