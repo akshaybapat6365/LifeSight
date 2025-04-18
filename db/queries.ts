@@ -10,7 +10,13 @@ import { user, chat, User, reservation } from "./schema";
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
-let client = postgres(`${process.env.POSTGRES_URL!}?sslmode=require`);
+
+// Use DATABASE_URL from .env and ensure it's defined
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not defined in the environment variables.");
+}
+// Connect using the DATABASE_URL directly (Neon URL includes sslmode)
+let client = postgres(process.env.DATABASE_URL);
 let db = drizzle(client);
 
 export async function getUser(email: string): Promise<Array<User>> {

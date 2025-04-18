@@ -1,6 +1,8 @@
-import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
 
 import { auth } from "@/app/(auth)/auth";
 
@@ -18,6 +20,17 @@ const FileSchema = z.object({
       },
     ),
 });
+
+// Ensure upload directory exists
+const createUploadDir = async () => {
+  const uploadDir = join(process.cwd(), 'public', 'uploads');
+  try {
+    await fs.mkdir(uploadDir, { recursive: true });
+  } catch (error) {
+    console.error('Failed to create uploads directory:', error);
+  }
+  return uploadDir;
+};
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -48,19 +61,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    const filename = file.name;
+    // Get file extension
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    // Generate unique filename
+    const uniqueFilename = `${randomUUID()}.${fileExt}`;
+    
+    // Create uploads directory
+    const uploadDir = await createUploadDir();
+    
+    // Save file path
+    const filePath = join(uploadDir, uniqueFilename);
+    
+    // Convert file to buffer and save
     const fileBuffer = await file.arrayBuffer();
+    await fs.writeFile(filePath, Buffer.from(fileBuffer));
+    
+    // Generate URL for the saved file
+    const url = `/uploads/${uniqueFilename}`;
 
-    try {
-      const data = await put(`${filename}`, fileBuffer, {
-        access: "public",
-      });
-
-      return NextResponse.json(data);
-    } catch (error) {
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
-    }
+    return NextResponse.json({
+      url,
+      pathname: url,
+      contentType: file.type,
+      size: file.size,
+    });
   } catch (error) {
+    console.error('Upload error:', error);
     return NextResponse.json(
       { error: "Failed to process request" },
       { status: 500 },
