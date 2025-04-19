@@ -1,10 +1,13 @@
+// Node.js built-ins
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
-import { GoogleGenAI } from '@google/genai';
+// External packages
+import { GoogleGenerativeAI } from '@google/genai';
 import { NextResponse } from 'next/server';
 
+// Local imports
 import { auth } from '@/app/(auth)/auth';
 
 // Configure the AI client
@@ -13,7 +16,7 @@ const configureAI = () => {
   if (!apiKey) {
     throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not defined');
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenerativeAI(apiKey);
 };
 
 // Ensure upload directory exists
