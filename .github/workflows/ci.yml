@@ -80,59 +80,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4 # Checkout again or use downloaded artifact?
-                                  # Using checkout is simpler if build doesn't modify source much
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      # Node & pnpm
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
+          node-version: 20
+      - uses: pnpm/action-setup@v2
         with:
           version: 8
-          run_install: false # Dependencies installed later
+          run_install: false
 
+      # pnpm cache
       - name: Get pnpm store directory
         id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-            
-      # Download the build output from the build job
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      # Restore build output
+      - uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: . # Download to the root
+          path: .
 
-      - name: Install dependencies
-        # Install devDependencies needed for Playwright & start
-        run: pnpm install --frozen-lockfile --prod=false
+      # Dev dependencies + browsers
+      - run: pnpm install --frozen-lockfile --prod=false
+      - run: pnpm exec playwright install --with-deps
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+      # Start app and wait
+      - run: pnpm start &
+      - run: npx wait-on http://localhost:3000 -t 60000
 
-      - name: Start app in background
-        run: pnpm start &
-        # Add a wait step to ensure the server is ready
-      - name: Wait for server
-        run: npx wait-on http://localhost:3000 -t 60000 # Wait up to 60s
-
+      # Run tests
       - name: Run Playwright tests
         run: pnpm run test:ci
 
-      - name: Upload Playwright report
-        if: failure()
+      # Upload report on failure
+      - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-report
