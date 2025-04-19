@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Get API key from environment variable
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -56,8 +56,7 @@ async function testApproach2() {
       {
         inlineData: {
           mimeType: 'image/png',
-          data: base64Data,
-          size_bytes: buffer.length
+          data: base64Data
         }
       },
       { text: 'Describe this test image briefly.' }

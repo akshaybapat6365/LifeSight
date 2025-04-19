@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 
 // External packages
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
 // Local imports
@@ -124,8 +124,7 @@ export async function POST(request: Request) {
             {
               inlineData: {
                 mimeType: filetype,
-                data: image,
-                sizeBytes: buffer.length // Add size in bytes to help Gemini process the image correctly
+                data: image
               }
             },
             { 

@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 
 // External packages
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
 // Local imports
@@ -76,87 +76,51 @@ export async function POST(request: Request) {
     try {
       console.log(`Processing file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
       
-      // Convert the file to a Blob for uploading to Gemini API
-      const fileBlob = new Blob([Buffer.from(fileBuffer)], { type: file.type });
-      
-      // Add size information for proper handling
-      Object.defineProperty(fileBlob, 'sizeBytes', {
-        value: file.size,
-        writable: false
-      });
-      
       // Configure AI client
       const ai = configureAI();
       
-      console.log("Uploading image to Gemini API...");
-      
-      // Upload the file to Gemini API with detailed logging
-      console.log("File details:", {
-        size: file.size,
-        type: file.type,
-        name: file.name,
-        blobSize: fileBlob.size,
-        sizeBytes: (fileBlob as any).sizeBytes
-      });
-      
-      // Upload the file to Gemini API
-      const uploadedFile = await ai.files.upload({
-        file: fileBlob,
-      });
-      
-      console.log("File uploaded successfully, ID:", uploadedFile.uri);
+      console.log("Preparing image for Gemini API...");
       
       // Configure the model for analysis
-      const model = 'gemini-2.5-pro-preview-03-25';
-      const config = {
-        responseMimeType: 'text/plain',
-        systemInstruction: [
-          {
-            text: `You are BloodInsight AI, an assistant specialized in analyzing and explaining blood test and lab reports. 
-Your task is to:
-1. Extract key metrics and values from the provided lab report
-2. Identify which values are within normal range and which are outside normal range
-3. Provide a clear, simple explanation of what each metric means and its significance
-4. Offer general insights about the overall health picture based on these results
-5. Suggest potential lifestyle modifications or follow-up actions when appropriate
-
-Important notes:
-- Always clarify that your analysis is for educational purposes only and not a substitute for medical advice
-- Use plain, accessible language that a non-medical person can understand
-- When values are outside normal range, explain the potential implications without causing alarm
-- Organize information in a structured, easy-to-read format
-- Focus on factual information and avoid speculative diagnoses`,
-          }
-        ],
-      };
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-pro" });
       
       console.log("Generating content with Gemini API...");
       
-      // Create the prompt with the file reference
-      const contents = [
-        {
-          role: 'user',
+      // Create the prompt with the file data directly
+      const result = await model.generateContent({
+        contents: [{
+          role: "user",
           parts: [
             {
-              fileData: {
-                fileUri: uploadedFile.uri,
-                mimeType: uploadedFile.mimeType,
+              text: "You are BloodInsight AI, specialized in analyzing blood test reports. Please extract metrics, identify abnormal values, explain their significance, and provide health insights. Always clarify this is for educational purposes only and not medical advice."
+            }
+          ]
+        }, {
+          role: "model",
+          parts: [
+            {
+              text: "I am BloodInsight AI, an assistant specialized in analyzing blood test reports. I will help you understand your lab results by extracting key metrics, identifying which values are normal or abnormal, explaining what each measurement means, and providing helpful health insights based on the data. I'll present the information in a clear, structured format using plain language that's easy to understand.\n\nPlease note that my analysis is for educational purposes only and should not be considered medical advice. Always consult with your healthcare provider to properly interpret your test results and make health decisions."
+            }
+          ]
+        }, {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType: file.type,
+                data: Buffer.from(fileBuffer).toString('base64')
               }
             },
-          ],
-        }
-      ];
-      
-      // Generate content
-      const response = await ai.models.generateContent({
-        model,
-        config,
-        contents,
+            { 
+              text: "This is a blood test report. Please analyze it and extract all key metrics, indicating which values are within normal range and which are outside the normal range. Provide a clear explanation of what each metric means and its significance."
+            }
+          ]
+        }]
       });
       
       console.log("Successfully received analysis from Gemini API");
       
-      const text = response.text;
+      const text = result.response.text();
       
       // Return the analysis and the URL for the saved image
       return NextResponse.json({
