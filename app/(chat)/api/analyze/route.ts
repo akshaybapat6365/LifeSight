@@ -7,8 +7,6 @@ import { NextResponse } from 'next/server';
 
 import { auth } from '@/app/(auth)/auth';
 
-// Import the correct Google Generative AI SDK
-
 // Configure the AI client
 const configureAI = () => {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;

@@ -2,9 +2,10 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
-// Import the correct Google Generative AI SDK
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/genai';
 import { NextResponse } from 'next/server';
+
+import { auth } from '@/app/(auth)/auth';
 
 // Configure the AI client
 const configureAI = () => {
@@ -12,7 +13,7 @@ const configureAI = () => {
   if (!apiKey) {
     throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not defined');
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI({ apiKey });
 };
 
 // Ensure upload directory exists

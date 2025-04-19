@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
+import { GoogleGenerativeAI } from '@google/genai';
 
 // Get API key from environment or hardcode for testing only
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
