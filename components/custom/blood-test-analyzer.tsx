@@ -1,6 +1,5 @@
 "use client";
 
-
 import { AlertCircle, Loader2, UploadCloud } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
@@ -9,7 +8,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function BloodTestAnalyzer() {
+interface BloodTestAnalyzerProps {
+  useTestEndpoint?: boolean;
+}
+
+export function BloodTestAnalyzer({ useTestEndpoint = false }: BloodTestAnalyzerProps) {
   const [file, setFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<string | null>(null);
@@ -55,28 +58,88 @@ export function BloodTestAnalyzer() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
+      // Use the appropriate endpoint based on the useTestEndpoint prop
+      const endpoint = useTestEndpoint ? "/api/analyze-test" : "/api/analyze";
       
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to analyze the image");
-      }
+      if (useTestEndpoint) {
+        // For test endpoint: convert file to base64 and send as JSON
+        const base64 = await fileToBase64(file);
+        
+        // Add logging before the fetch
+        console.log('Posting image to test endpoint', { 
+          name: file.name, 
+          size: file.size,
+          type: file.type,
+          endpoint 
+        });
+        
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: base64.split(",")[1], // Remove the data:image/xxx;base64, prefix
+            filename: file.name,
+            filetype: file.type
+          }),
+        });
+        
+        console.log('Server replied with status:', response.status);
+        const data = await response.json().catch(() => ({ error: 'Failed to parse JSON response' }));
+        console.log('Response payload:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to analyze the image");
+        }
+        
+        setAnalysis(data.analysis);
+      } else {
+        // For regular endpoint: use FormData
+        const formData = new FormData();
+        formData.append("file", file);
 
-      setAnalysis(data.analysis);
-      console.log("Analysis completed successfully:", data.analysis);
+        // Add logging before the fetch
+        console.log('Posting image to regular endpoint', { 
+          name: file.name, 
+          size: file.size,
+          type: file.type,
+          endpoint
+        });
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          body: formData,
+        });
+
+        console.log('Server replied with status:', response.status);
+        const data = await response.json().catch(() => ({ error: 'Failed to parse JSON response' }));
+        console.log('Response payload:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to analyze the image");
+        }
+        
+        setAnalysis(data.analysis);
+      }
+      
+      console.log("Analysis completed successfully");
     } catch (error) {
       console.error("Error analyzing blood test:", error);
       setError(error instanceof Error ? error.message : "Failed to analyze the image");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to convert File to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const resetForm = () => {
@@ -158,6 +221,7 @@ export function BloodTestAnalyzer() {
                 onClick={analyzeBloodTest} 
                 disabled={!file || loading}
                 className="px-6"
+                type="button" // Ensure this is not a submit button which could cause form submission
               >
                 Analyze Blood Test
               </Button>
@@ -186,7 +250,7 @@ export function BloodTestAnalyzer() {
             </div>
 
             <div className="flex justify-center mt-4">
-              <Button variant="outline" onClick={resetForm}>
+              <Button variant="outline" onClick={resetForm} type="button">
                 Analyze Another Image
               </Button>
             </div>

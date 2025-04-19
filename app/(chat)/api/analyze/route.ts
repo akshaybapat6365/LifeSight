@@ -79,17 +79,32 @@ export async function POST(request: Request) {
       // Convert the file to a Blob for uploading to Gemini API
       const fileBlob = new Blob([Buffer.from(fileBuffer)], { type: file.type });
       
+      // Add size information for proper handling
+      Object.defineProperty(fileBlob, 'sizeBytes', {
+        value: file.size,
+        writable: false
+      });
+      
       // Configure AI client
       const ai = configureAI();
       
       console.log("Uploading image to Gemini API...");
+      
+      // Upload the file to Gemini API with detailed logging
+      console.log("File details:", {
+        size: file.size,
+        type: file.type,
+        name: file.name,
+        blobSize: fileBlob.size,
+        sizeBytes: (fileBlob as any).sizeBytes
+      });
       
       // Upload the file to Gemini API
       const uploadedFile = await ai.files.upload({
         file: fileBlob,
       });
       
-      console.log("File uploaded successfully, getting model...");
+      console.log("File uploaded successfully, ID:", uploadedFile.uri);
       
       // Configure the model for analysis
       const model = 'gemini-2.5-pro-preview-03-25';
@@ -151,6 +166,7 @@ Important notes:
       
     } catch (error: any) {
       console.error('Error analyzing image:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
       
       // Provide more specific error messages based on error type
       let errorMessage = 'Failed to analyze the image';
@@ -172,14 +188,14 @@ Important notes:
       }
       
       return NextResponse.json(
-        { error: errorMessage },
+        { error: errorMessage, details: String(error) },
         { status: statusCode }
       );
     }
   } catch (error) {
     console.error('Request processing error:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'Failed to process request', details: String(error) },
       { status: 500 }
     );
   }

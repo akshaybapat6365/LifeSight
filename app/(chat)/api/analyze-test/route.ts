@@ -124,7 +124,8 @@ export async function POST(request: Request) {
             {
               inlineData: {
                 mimeType: filetype,
-                data: image
+                data: image,
+                sizeBytes: buffer.length // Add size in bytes to help Gemini process the image correctly
               }
             },
             { 
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
       
     } catch (error: any) {
       console.error('Error analyzing image:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
       
       // Provide more specific error messages based on error type
       let errorMessage = 'Failed to analyze the image';
@@ -167,14 +169,14 @@ export async function POST(request: Request) {
       }
       
       return NextResponse.json(
-        { error: errorMessage },
+        { error: errorMessage, details: String(error) },
         { status: statusCode }
       );
     }
   } catch (error) {
     console.error('Request processing error:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'Failed to process request', details: String(error) },
       { status: 500 }
     );
   }
