@@ -6,17 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+# Define environment variables at the top level for all jobs
+env:
+  DATABASE_URL: "file:./tmp-ci.db"
+  NEXTAUTH_SECRET: "ci-temp-secret"
+  SKIP_DB_MIGRATE: "1"
+  NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+  TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+  TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
 jobs:
   build:
+    name: Build & Lint
     runs-on: ubuntu-latest
     
-    env:
-      DATABASE_URL: "file:./tmp-ci.db"
-      NEXTAUTH_SECRET: "ci-temp-secret"
-      NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
-      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-
     steps:
       - uses: actions/checkout@v4
       
@@ -50,24 +53,87 @@ jobs:
       
       - name: Lint
         run: pnpm run lint
-      
-      # -----------------------------------------
-      # E2E tests (run only on main)
-      # -----------------------------------------
+
+      - name: Build
+        run: pnpm run build
+
+      # Upload build artifacts to be used by the e2e job
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            .next/
+            public/
+            package.json
+            pnpm-lock.yaml
+            next.config.mjs # Include any necessary config files
+            # Add other necessary files/dirs for pnpm start to work
+
+  # -----------------------------------------
+  # E2E job — only on main
+  # -----------------------------------------
+  e2e:
+    name: E2E Tests
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4 # Checkout again or use downloaded artifact?
+                                  # Using checkout is simpler if build doesn't modify source much
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false # Dependencies installed later
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+            
+      # Download the build output from the build job
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: . # Download to the root
+
+      - name: Install dependencies
+        # Install devDependencies needed for Playwright & start
+        run: pnpm install --frozen-lockfile --prod=false
+
       - name: Install Playwright browsers
-        if: github.ref == 'refs/heads/main'
         run: pnpm exec playwright install --with-deps
-      
-      - name: E2E tests
-        if: github.ref == 'refs/heads/main'
+
+      - name: Start app in background
+        run: pnpm start &
+        # Add a wait step to ensure the server is ready
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000 -t 60000 # Wait up to 60s
+
+      - name: Run Playwright tests
         run: pnpm run test:ci
-      
+
       - name: Upload Playwright report
-        if: failure() && github.ref == 'refs/heads/main'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-report
-          path: playwright-report
-      
-      - name: Build
-        run: pnpm run build 
+          path: playwright-report 

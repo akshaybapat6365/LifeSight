@@ -7,6 +7,12 @@ config({
   path: ".env", // Load from .env instead of .env.local
 });
 
+// Skip migrations in CI branch builds
+if (process.env.SKIP_DB_MIGRATE === '1') {
+  console.log('⚠  SKIP_DB_MIGRATE=1 → skipping database migrations');
+  process.exit(0);
+}
+
 const runMigrate = async () => {
   // Use DATABASE_URL instead of POSTGRES_URL
   if (!process.env.DATABASE_URL) {
