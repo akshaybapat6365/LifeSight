@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 
@@ -85,12 +86,10 @@ export async function POST(request: Request) {
       pathname: url,
       contentType: file.type,
       size: file.size,
+      fileId: url,  // Add fileId for Gemini compatibility
     });
-  } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json(
-      { error: "Failed to process request" },
-      { status: 500 },
-    );
+  } catch (err) {
+    console.error('Chat route error', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/app/(auth)/auth';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+
+import { GoogleGenAI } from '@google/genai';
+import { NextResponse } from 'next/server';
+
+import { auth } from '@/app/(auth)/auth';
 
 // Import the correct Google Generative AI SDK
-import { GoogleGenAI } from '@google/genai';
 
 // Configure the AI client
 const configureAI = () => {

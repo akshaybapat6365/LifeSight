@@ -59,7 +59,10 @@ export function Chat({
           />
         </div>
 
-        <form className="flex flex-row gap-2 relative items-end w-full md:max-w-[500px] max-w-[calc(100dvw-32px) px-4 md:px-0">
+        <form 
+          className="flex flex-row gap-2 relative items-end w-full md:max-w-[500px] max-w-[calc(100dvw-32px) px-4 md:px-0"
+          onSubmit={(e) => e.preventDefault()}
+        >
           <MultimodalInput
             input={input}
             setInput={setInput}

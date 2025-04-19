@@ -149,13 +149,13 @@ devDependencies:
     specifier: ^4.0.8
     version: 4.0.9
   '@types/node':
-    specifier: ^20
+    specifier: ^20.17.30
     version: 20.17.30
   '@types/pdf-parse':
     specifier: ^1.1.4
     version: 1.1.5
   '@types/react':
-    specifier: ^18
+    specifier: ^18.3.20
     version: 18.3.20
   '@types/react-dom':
     specifier: ^18
@@ -191,7 +191,7 @@ devDependencies:
     specifier: ^4.19.1
     version: 4.19.3
   typescript:
-    specifier: ^5
+    specifier: ^5.8.3
     version: 5.8.3
 
 packages:

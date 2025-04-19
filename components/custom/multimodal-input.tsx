@@ -101,20 +101,27 @@ export function MultimodalInput({
     const formData = new FormData();
     formData.append("file", file);
 
+    console.log('Posting image', { name: file.name, size: file.size });
+
     try {
       const response = await fetch(`/api/files/upload`, {
         method: "POST",
         body: formData,
       });
 
+      console.log('Server replied', response.status);
+      const data = await response.json().catch(() => ({}));
+      console.log('Payload', data);
+
       if (response.ok) {
-        const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, size, fileId } = data;
 
         return {
           url,
           name: pathname,
           contentType: contentType,
+          size: size,
+          fileId: fileId,
         };
       } else {
         const { error } = await response.json();

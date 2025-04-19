@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+
+import { AlertCircle, Loader2, UploadCloud } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, Loader2, UploadCloud } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function BloodTestAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
@@ -96,7 +98,7 @@ export function BloodTestAnalyzer() {
       <div className="p-6 space-y-6">
         {loading && (
           <div className="flex flex-col items-center justify-center py-10">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <Loader2 className="size-12 animate-spin text-primary mb-4" />
             <p className="text-lg font-medium">Analyzing your blood test results...</p>
             <p className="text-sm text-muted-foreground mt-2">This may take up to 30 seconds</p>
           </div>
@@ -110,7 +112,7 @@ export function BloodTestAnalyzer() {
                 className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 hover:bg-gray-100 dark:border-gray-600"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <UploadCloud className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" />
+                  <UploadCloud className="size-8 mb-4 text-gray-500 dark:text-gray-400" />
                   <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
                     <span className="font-semibold">Click to upload</span> or drag and drop
                   </p>
@@ -145,7 +147,7 @@ export function BloodTestAnalyzer() {
             
             {error && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="size-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>

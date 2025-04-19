@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# === LifeSight Project‑Specific Rules ===
+1. Environment
+   • Only .env.local (ignored by Git) stores real secrets.  
+   • Keep .env.example with placeholder values only.  
+   • Access all secrets via process.env (no literals).
+2. URL Handling
+   • Use getBaseURL() / toAbsoluteURL() from utils/url.ts everywhere.  
+   • Gemini uses attachments: [{ fileId }]; OpenAI uses files: [{ url }].
+3. File Uploads
+   • Pass raw File object to Gemini; max 5 MB; return 400 on overflow.
+4. Branch Strategy
+   • Default branch main.  
+   • Feature branches feature/<scope>; merge via PR with review.  
+   • Force‑push allowed only for secret‑purge history rewrites.
+5. Pre‑commit Hooks (Husky)
+   • gitleaks protect --staged --redact  
+   • pnpm lint --fix  
+   • pnpm typecheck (tsc no‑emit)
+6. CI Matrix
+   • Node 20 LTS on Ubuntu & macOS.  
+   • Steps: install → build → next lint → playwright tests.
+7. Releases
+   • Use Commitizen to generate changelog; GitHub Action tags & deploys.
+8. IDE Defaults
+   • VS Code workspace: "editor.formatOnSave": true.  
+   • Recommend Prettier + ESLint extensions.
+# =========================================
