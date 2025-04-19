@@ -1,10 +1,13 @@
+// Node.js built-ins
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
-import { GoogleGenerativeAI } from '@google/genai';
+// External packages
+import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
 
+// Local imports
 import { auth } from '@/app/(auth)/auth';
 
 // Configure the AI client
@@ -13,7 +16,7 @@ const configureAI = () => {
   if (!apiKey) {
     throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not defined');
   }
-  return new GoogleGenerativeAI({ apiKey });
+  return new GoogleGenAI({ apiKey });
 };
 
 // Ensure upload directory exists
@@ -94,15 +97,11 @@ export async function POST(request: Request) {
       // Configure the AI client
       const genAI = configureAI();
       
-      // Use the getGenerativeModel method with the correct model name
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-pro",
-      });
-      
       console.log("Sending image to Gemini API for analysis...");
       
-      // Use the same direct approach from the main endpoint
-      const result = await model.generateContent({
+      // Use the correct approach with models.generateContent
+      const result = await genAI.models.generateContent({
+        model: "gemini-1.5-pro",
         contents: [{
           role: "user",
           parts: [
@@ -135,7 +134,7 @@ export async function POST(request: Request) {
       
       console.log("Successfully received analysis from Gemini API");
       
-      const text = result.response.text();
+      const text = result.text;
       
       // Return the analysis and the URL for the saved image
       return NextResponse.json({
